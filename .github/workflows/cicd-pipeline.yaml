@@ -45,27 +45,27 @@ jobs:
 
   # Развёртывание на dev
   deploy-dev:
-    runs-on: self-hosted
-    if: runner.os == 'Linux' && startsWith(runner.hostname, 'dev')
+    runs-on: [self-hosted, dev]
+    if: github.ref_name == 'dev' || startsWith(github.ref_name, 'feature/')
     steps:
       - name: Pull and deploy from Docker Hub
         run: |
           IMAGE_NAME="${{ env.IMAGE_NAME }}"
-          docker pull ${{ secrets.DOCKER_USERNAME }}/${IMAGE_NAME}:dev
+          docker pull ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:dev
           docker stop app || true
           docker rm app || true
-          docker run -d --name app -p 80:80 ${{ secrets.DOCKER_USERNAME }}/${IMAGE_NAME}:dev
+          docker run -d --name app -p 80:80 ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:dev
 
   # Развёртывание на prod
   deploy-prod:
-    runs-on: self-hosted
-    if: runner.os == 'Linux' && startsWith(runner.hostname, 'prod')
+    runs-on: [self-hosted, prod]
+    if: github.ref_name == 'main'
     needs: build-and-push
     steps:
       - name: Pull and deploy from Docker Hub
         run: |
           IMAGE_NAME="${{ env.IMAGE_NAME }}"
-          docker pull ${{ secrets.DOCKER_USERNAME }}/${IMAGE_NAME}:prod
+          docker pull ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:prod
           docker stop app || true
           docker rm app || true
-          docker run -d --name app -p 80:80 ${{ secrets.DOCKER_USERNAME }}/${IMAGE_NAME}:prod
+          docker run -d --name app -p 80:80 ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:prod
