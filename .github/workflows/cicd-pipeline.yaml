@@ -42,7 +42,7 @@ jobs:
           echo "Building image: $IMAGE_NAME:$TAG"
           
           # Сборка образа Docker
-          docker build -t $IMAGE_NAME:$TAG ./app
+          docker build -t $IMAGE_NAME:$TAG .
           
           # Публикация образа в Docker Hub
           docker push $IMAGE_NAME:$TAG
