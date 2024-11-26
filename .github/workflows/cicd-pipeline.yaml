@@ -24,7 +24,7 @@ jobs:
       - name: Build and Push Docker Image
         env:
           # Использование переменной REPOSITORY из соответствующего окружения (DEV или PROD)
-          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ vars.REPOSITORY }}  # Используем vars для получения значения переменной из окружения
+          IMAGE_NAME: srnipoi10/${{ vars.REPOSITORY }}  # Используем vars для получения значения переменной из окружения
         run: |
           # Создание тега с учетом ветки и номера выполнения
           TAG="${{ github.ref_name }}-${{ github.run_number }}"
