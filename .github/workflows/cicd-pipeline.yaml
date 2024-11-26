@@ -1,0 +1,71 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - feature/**
+  pull_request:
+    branches:
+      - dev
+
+env:
+  IMAGE_NAME: nodejs-app
+
+jobs:
+  # Сборка образа и загрузка в Docker Hub
+  build-and-push:
+    runs-on: self-hosted
+    if: runner.os == 'Linux' && startsWith(runner.hostname, 'runner')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USER }}" --password-stdin
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_NAME="${{ env.IMAGE_NAME }}"
+          BRANCH=$(echo "${GITHUB_REF}" | awk -F/ '{print $NF}')
+
+          if [[ $BRANCH == "main" ]]; then
+            TARGET="prod"
+          else
+            TARGET="dev"
+          fi
+
+          docker build -t ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:${GITHUB_SHA} .
+          docker push ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:${GITHUB_SHA}
+
+          # Push additional "dev" or "prod" tags for simplicity
+          docker tag ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:${GITHUB_SHA} ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:${TARGET}
+          docker push ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:${TARGET}
+
+  # Развёртывание на dev
+  deploy-dev:
+    runs-on: self-hosted
+    if: runner.os == 'Linux' && startsWith(runner.hostname, 'dev')
+    steps:
+      - name: Pull and deploy from Docker Hub
+        run: |
+          IMAGE_NAME="${{ env.IMAGE_NAME }}"
+          docker pull ${{ secrets.DOCKER_USERNAME }}/${IMAGE_NAME}:dev
+          docker stop app || true
+          docker rm app || true
+          docker run -d --name app -p 80:80 ${{ secrets.DOCKER_USERNAME }}/${IMAGE_NAME}:dev
+
+  # Развёртывание на prod
+  deploy-prod:
+    runs-on: self-hosted
+    if: runner.os == 'Linux' && startsWith(runner.hostname, 'prod')
+    needs: build-and-push
+    steps:
+      - name: Pull and deploy from Docker Hub
+        run: |
+          IMAGE_NAME="${{ env.IMAGE_NAME }}"
+          docker pull ${{ secrets.DOCKER_USERNAME }}/${IMAGE_NAME}:prod
+          docker stop app || true
+          docker rm app || true
+          docker run -d --name app -p 80:80 ${{ secrets.DOCKER_USERNAME }}/${IMAGE_NAME}:prod
