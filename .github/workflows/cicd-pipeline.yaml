@@ -35,10 +35,10 @@ jobs:
 
       - name: Build and Push Docker Image
         env:
-          IMAGE_NAME: srnipoi10/${{ env.REPO }}  # Используем переменную REPO для определения репозитория
+          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ env.REPO }}  # Используем переменную REPO для определения репозитория
         run: |
-          # Создание тега с учетом ветки и номера выполнения
-          TAG="${{ github.ref_name }}-${{ github.run_number }}"
+          # Создание тега с заменой "/" на "-"
+          TAG="$(echo "${{ github.ref_name }}" | sed 's|/|-|g')-${{ github.run_number }}"
           echo "Building image: $IMAGE_NAME:$TAG"
           
           # Сборка образа Docker
