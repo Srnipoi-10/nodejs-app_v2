@@ -60,7 +60,7 @@ jobs:
     steps:
       - name: Deploy Application to DEV
         env:
-          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ env.REPO }}  # Используем переменную REPO для определения репозитория
+          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ vars.REPOSITORY }}  # Используем переменную REPOSITORY для определения репозитория
         run: |
           # Формирование тега с учетом ветки и номера выполнения
           SAFE_BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's|/|-|g')
@@ -90,7 +90,7 @@ jobs:
     steps:
       - name: Deploy Application to PROD
         env:
-          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ env.REPO }}  # Используем переменную REPO для определения репозитория
+          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ vars.REPOSITORY }}  # Используем переменную REPO для определения репозитория
         run: |
           # Формирование тега с учетом ветки и номера выполнения
           SAFE_BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's|/|-|g')
