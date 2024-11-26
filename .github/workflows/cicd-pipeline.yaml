@@ -9,8 +9,7 @@ on:
 jobs:
   # Логин в Docker Hub на builder
   login-docker-hub:
-    runs-on: self-hosted
-    labels: [builder]
+    runs-on: [self-hosted, builder]  # Указание на self-hosted и builder
     steps:
       - uses: actions/checkout@v3
       - name: Login to Docker Hub
@@ -20,8 +19,7 @@ jobs:
   # Сборка и публикация Docker образа
   build-and-push:
     needs: login-docker-hub
-    runs-on: self-hosted
-    labels: [builder]
+    runs-on: [self-hosted, builder]  # Указание на self-hosted и builder
     steps:
       - name: Build and Push Docker Image
         env:
@@ -36,8 +34,7 @@ jobs:
   # Деплой на dev
   deploy-dev:
     if: startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/feature/')
-    runs-on: self-hosted
-    labels: [dev]
+    runs-on: [self-hosted, dev]  # Указание на self-hosted и dev
     environment: DEV
     needs: build-and-push
     steps:
@@ -53,8 +50,7 @@ jobs:
   # Деплой на prod
   deploy-prod:
     if: startsWith(github.ref, 'refs/heads/main')
-    runs-on: self-hosted
-    labels: [prod]
+    runs-on: [self-hosted, prod]  # Указание на self-hosted и prod
     environment: PROD
     needs: build-and-push
     steps:
