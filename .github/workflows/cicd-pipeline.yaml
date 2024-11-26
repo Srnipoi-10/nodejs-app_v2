@@ -23,42 +23,64 @@ jobs:
     steps:
       - name: Build and Push Docker Image
         env:
-          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ github.event.environment.REPOSITORY }}
+          # Использование переменной REPOSITORY из соответствующего окружения (DEV или PROD)
+          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ vars.REPOSITORY }}  # Используем vars для получения значения переменной из окружения
         run: |
+          # Создание тега с учетом ветки и номера выполнения
           TAG="${{ github.ref_name }}-${{ github.run_number }}"
           echo "Building image: $IMAGE_NAME:$TAG"
+          
+          # Сборка образа Docker
           docker build -t $IMAGE_NAME:$TAG ./app
+          
+          # Публикация образа в Docker Hub
           docker push $IMAGE_NAME:$TAG
+          
+          # Удаление локального образа после публикации
           docker rmi $IMAGE_NAME:$TAG
 
   # Деплой на dev
   deploy-dev:
+    # Условие для деплоя на dev: выполняется для веток 'dev' и 'feature/**'
     if: startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/feature/')
     runs-on: [self-hosted, dev]  # Указание на self-hosted и dev
-    environment: DEV
+    environment: DEV  # Указание окружения для dev
     needs: build-and-push
     steps:
       - name: Deploy Application to DEV
         env:
-          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ github.event.environment.REPOSITORY }}
+          # Получение имени образа для деплоя на dev
+          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ vars.REPOSITORY }}  # Используем vars для получения имени репозитория
         run: |
+          # Формирование тега с учетом ветки и номера выполнения
           TAG="${{ github.ref_name }}-${{ github.run_number }}"
           echo "Deploying image: $IMAGE_NAME:$TAG to DEV"
+          
+          # Удаление старого контейнера, если он существует
           docker rm -f app || true
+          
+          # Запуск нового контейнера с нужным образом
           docker run -d -p 80:80 --name app $IMAGE_NAME:$TAG
 
   # Деплой на prod
   deploy-prod:
+    # Условие для деплоя на prod: выполняется для ветки 'main'
     if: startsWith(github.ref, 'refs/heads/main')
     runs-on: [self-hosted, prod]  # Указание на self-hosted и prod
-    environment: PROD
+    environment: PROD  # Указание окружения для prod
     needs: build-and-push
     steps:
       - name: Deploy Application to PROD
         env:
-          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ github.event.environment.REPOSITORY }}
+          # Получение имени образа для деплоя на prod
+          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ vars.REPOSITORY }}  # Используем vars для получения имени репозитория
         run: |
+          # Формирование тега с учетом ветки и номера выполнения
           TAG="${{ github.ref_name }}-${{ github.run_number }}"
           echo "Deploying image: $IMAGE_NAME:$TAG to PROD"
+          
+          # Удаление старого контейнера, если он существует
           docker rm -f app || true
+          
+          # Запуск нового контейнера с нужным образом
           docker run -d -p 80:80 --name app $IMAGE_NAME:$TAG
