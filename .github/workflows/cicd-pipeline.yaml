@@ -23,8 +23,12 @@ jobs:
     steps:
       - name: Build and Push Docker Image
         env:
-          # Использование переменной REPOSITORY из соответствующего окружения (DEV или PROD)
-          IMAGE_NAME: srnipoi10/${{ vars.REPOSITORY }}  # Используем vars для получения значения переменной из окружения
+          # Динамический выбор репозитория на основе ветки
+          REPOSITORY: |
+            if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then echo "prod"; 
+            elif [[ "${{ github.ref }}" == "refs/heads/dev" || "${{ github.ref }}" == refs/heads/feature/* ]]; then echo "dev"; 
+            else echo "unknown"; fi
+          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ env.REPOSITORY }}
         run: |
           # Создание тега с учетом ветки и номера выполнения
           TAG="${{ github.ref_name }}-${{ github.run_number }}"
