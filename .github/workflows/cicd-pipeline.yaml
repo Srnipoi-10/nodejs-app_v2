@@ -7,7 +7,7 @@ on:
     branches: ["dev"]
 
 jobs:
-  # Логин в Docker Hub на builder
+  # Логин в Docker Hub
   login-docker-hub:
     runs-on: [self-hosted, builder]  # Указание на self-hosted и builder
     steps:
@@ -37,8 +37,9 @@ jobs:
         env:
           IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ env.REPO }}  # Используем переменную REPO для определения репозитория
         run: |
-          # Создание тега с заменой "/" на "-"
-          TAG="$(echo "${{ github.ref_name }}" | sed 's|/|-|g')-${{ github.run_number }}"
+          # Создание безопасного имени тега
+          SAFE_BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's|/|-|g')
+          TAG="${SAFE_BRANCH_NAME}-${{ github.run_number }}"
           echo "Building image: $IMAGE_NAME:$TAG"
           
           # Сборка образа Docker
@@ -50,7 +51,6 @@ jobs:
           # Удаление локального образа после публикации
           docker rmi $IMAGE_NAME:$TAG
 
-  # Деплой на dev
   deploy-dev:
     # Условие для деплоя на dev: выполняется для веток 'dev' и 'feature/**'
     if: startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/feature/')
@@ -60,20 +60,27 @@ jobs:
     steps:
       - name: Deploy Application to DEV
         env:
-          # Получение имени образа для деплоя на dev
-          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ vars.REPOSITORY }}  # Используем vars для получения имени репозитория
+          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ vars.REPOSITORY }}  # Используем переменную REPOSITORY для определения репозитория
         run: |
           # Формирование тега с учетом ветки и номера выполнения
-          TAG="${{ github.ref_name }}-${{ github.run_number }}"
+          SAFE_BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's|/|-|g')
+          TAG="${SAFE_BRANCH_NAME}-${{ github.run_number }}"
           echo "Deploying image: $IMAGE_NAME:$TAG to DEV"
-          
+
+          # Определение порта в зависимости от ветки
+          if [[ "${{ github.ref }}" == refs/heads/feature/* ]]; then
+            PORT=8080
+          else
+            PORT=80
+          fi
+          echo "Using port: $PORT"
+
           # Удаление старого контейнера, если он существует
           docker rm -f app || true
           
           # Запуск нового контейнера с нужным образом
-          docker run -d -p 80:80 --name app $IMAGE_NAME:$TAG
+          docker run -d -p $PORT:80 --name app $IMAGE_NAME:$TAG
 
-  # Деплой на prod
   deploy-prod:
     # Условие для деплоя на prod: выполняется для ветки 'main'
     if: startsWith(github.ref, 'refs/heads/main')
@@ -83,11 +90,11 @@ jobs:
     steps:
       - name: Deploy Application to PROD
         env:
-          # Получение имени образа для деплоя на prod
-          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ vars.REPOSITORY }}  # Используем vars для получения имени репозитория
+          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ vars.REPOSITORY }}  # Используем переменную REPO для определения репозитория
         run: |
           # Формирование тега с учетом ветки и номера выполнения
-          TAG="${{ github.ref_name }}-${{ github.run_number }}"
+          SAFE_BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's|/|-|g')
+          TAG="${SAFE_BRANCH_NAME}-${{ github.run_number }}"
           echo "Deploying image: $IMAGE_NAME:$TAG to PROD"
           
           # Удаление старого контейнера, если он существует
