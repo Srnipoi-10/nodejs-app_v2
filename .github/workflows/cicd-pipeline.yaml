@@ -17,38 +17,38 @@ jobs:
           echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USER }}" --password-stdin
 
   build-and-push:
-  needs: login-docker-hub
-  runs-on: [self-hosted, builder]  # Указание на self-hosted и builder
-  steps:
-    - name: Determine the repository based on the branch
-      id: set-repository
-      run: |
-        # Проверка ветки и установка правильного репозитория
-        if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-          echo "REPO=prod" >> $GITHUB_ENV  # Для ветки main
-        elif [[ "${{ github.ref }}" == "refs/heads/dev" || "${{ github.ref }}" == refs/heads/feature/* ]]; then
-          echo "REPO=dev" >> $GITHUB_ENV  # Для веток dev и feature/*
-        else
-          echo "REPO=unknown" >> $GITHUB_ENV  # Если ветка не соответствует
-        fi
-        echo "Repository is set to ${{ env.REPO }}"
+    needs: login-docker-hub
+    runs-on: [self-hosted, builder]  # Указание на self-hosted и builder
+    steps:
+      - name: Determine the repository based on the branch
+        id: set-repository
+        run: |
+          # Проверка ветки и установка правильного репозитория
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "REPO=prod" >> $GITHUB_ENV  # Для ветки main
+          elif [[ "${{ github.ref }}" == "refs/heads/dev" || "${{ github.ref }}" == refs/heads/feature/* ]]; then
+            echo "REPO=dev" >> $GITHUB_ENV  # Для веток dev и feature/*
+          else
+            echo "REPO=unknown" >> $GITHUB_ENV  # Если ветка не соответствует
+          fi
+          echo "Repository is set to ${{ env.REPO }}"
 
-    - name: Build and Push Docker Image
-      env:
-        IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ env.REPO }}  # Используем переменную REPO для определения репозитория
-      run: |
-        # Создание тега с заменой "/" на "-"
-        TAG="$(echo "${{ github.ref_name }}" | sed 's|/|-|g')-${{ github.run_number }}"
-        echo "Building image: $IMAGE_NAME:$TAG"
-        
-        # Сборка образа Docker
-        docker build -t $IMAGE_NAME:$TAG .
-        
-        # Публикация образа в Docker Hub
-        docker push $IMAGE_NAME:$TAG
-        
-        # Удаление локального образа после публикации
-        docker rmi $IMAGE_NAME:$TAG
+      - name: Build and Push Docker Image
+        env:
+          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ env.REPO }}  # Используем переменную REPO для определения репозитория
+        run: |
+          # Создание тега с заменой "/" на "-"
+          TAG="$(echo "${{ github.ref_name }}" | sed 's|/|-|g')-${{ github.run_number }}"
+          echo "Building image: $IMAGE_NAME:$TAG"
+          
+          # Сборка образа Docker
+          docker build -t $IMAGE_NAME:$TAG .
+          
+          # Публикация образа в Docker Hub
+          docker push $IMAGE_NAME:$TAG
+          
+          # Удаление локального образа после публикации
+          docker rmi $IMAGE_NAME:$TAG
 
   # Деплой на dev
   deploy-dev:
