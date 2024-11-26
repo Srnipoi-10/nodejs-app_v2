@@ -1,71 +1,68 @@
-name: CI/CD Pipeline
+name: Docker Image CI/CD
 
 on:
   push:
-    branches:
-      - main
-      - dev
-      - feature/**
+    branches: ["dev", "main", "feature/**"]
   pull_request:
-    branches:
-      - dev
-
-env:
-  IMAGE_NAME: nodejs-app
+    branches: ["dev"]
 
 jobs:
-  # Сборка образа и загрузка в Docker Hub
-  build-and-push:
-    runs-on: [self-hosted, builder]
+  # Логин в Docker Hub на builder
+  login-docker-hub:
+    runs-on: self-hosted
+    labels: [builder]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
+      - uses: actions/checkout@v3
       - name: Login to Docker Hub
-        run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USER }}" --password-stdin
-
-      - name: Build and push Docker image
         run: |
-          IMAGE_NAME="${{ env.IMAGE_NAME }}"
-          BRANCH=$(echo "${GITHUB_REF}" | awk -F/ '{print $NF}')
+          echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USER }}" --password-stdin
 
-          if [[ $BRANCH == "main" ]]; then
-            TARGET="prod"
-          else
-            TARGET="dev"
-          fi
-
-
-          docker build -t ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:${GITHUB_SHA} .
-          docker push ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:${GITHUB_SHA}
-
-          # Push additional "dev" or "prod" tags for simplicity
-          docker tag ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:${GITHUB_SHA} ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:${TARGET}
-          docker push ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:${TARGET}
-
-  # Развёртывание на dev
-  deploy-dev:
-    runs-on: [self-hosted, dev]
-    if: github.ref_name == 'dev' || startsWith(github.ref_name, 'feature/')
+  # Сборка и публикация Docker образа
+  build-and-push:
+    needs: login-docker-hub
+    runs-on: self-hosted
+    labels: [builder]
     steps:
-      - name: Pull and deploy from Docker Hub
+      - name: Build and Push Docker Image
+        env:
+          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ github.event.environment.REPOSITORY }}
         run: |
-          IMAGE_NAME="${{ env.IMAGE_NAME }}"
-          docker pull ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:dev
-          docker stop app || true
-          docker rm app || true
-          docker run -d --name app -p 80:80 ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:dev
+          TAG="${{ github.ref_name }}-${{ github.run_number }}"
+          echo "Building image: $IMAGE_NAME:$TAG"
+          docker build -t $IMAGE_NAME:$TAG ./app
+          docker push $IMAGE_NAME:$TAG
+          docker rmi $IMAGE_NAME:$TAG
 
-  # Развёртывание на prod
-  deploy-prod:
-    runs-on: [self-hosted, prod]
-    if: github.ref_name == 'main'
+  # Деплой на dev
+  deploy-dev:
+    if: startsWith(github.ref, 'refs/heads/dev') || startsWith(github.ref, 'refs/heads/feature/')
+    runs-on: self-hosted
+    labels: [dev]
+    environment: DEV
     needs: build-and-push
     steps:
-      - name: Pull and deploy from Docker Hub
+      - name: Deploy Application to DEV
+        env:
+          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ github.event.environment.REPOSITORY }}
         run: |
-          IMAGE_NAME="${{ env.IMAGE_NAME }}"
-          docker pull ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:prod
-          docker stop app || true
-          docker rm app || true
-          docker run -d --name app -p 80:80 ${{ secrets.DOCKERHUB_USER }}/${IMAGE_NAME}:prod
+          TAG="${{ github.ref_name }}-${{ github.run_number }}"
+          echo "Deploying image: $IMAGE_NAME:$TAG to DEV"
+          docker rm -f app || true
+          docker run -d -p 80:80 --name app $IMAGE_NAME:$TAG
+
+  # Деплой на prod
+  deploy-prod:
+    if: startsWith(github.ref, 'refs/heads/main')
+    runs-on: self-hosted
+    labels: [prod]
+    environment: PROD
+    needs: build-and-push
+    steps:
+      - name: Deploy Application to PROD
+        env:
+          IMAGE_NAME: ${{ secrets.DOCKERHUB_USER }}/${{ github.event.environment.REPOSITORY }}
+        run: |
+          TAG="${{ github.ref_name }}-${{ github.run_number }}"
+          echo "Deploying image: $IMAGE_NAME:$TAG to PROD"
+          docker rm -f app || true
+          docker run -d -p 80:80 --name app $IMAGE_NAME:$TAG
